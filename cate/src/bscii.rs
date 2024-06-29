@@ -4,10 +4,37 @@ const BSCII: &str = r##"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123
 "##;
 
 
-fn get_map() -> [char; 94]{
-    let char_map: Vec<char> = BSCII.chars().collect();
-    let char_map: [char; 94] = char_map.try_into().expect("ASCII");
+fn get_map() -> [char; 256]{
+    let mut char_map: [char; 256] = ['X' as char; 256];
+    let mut i = 33;
+    for c in BSCII.chars() {
+        char_map[i] = c;
+        i += 1;
+    }
     return char_map;
+}
+
+
+fn get_reverse_map() -> [char; 256]{
+    let mut char_map: [char; 256] = ['X' as char; 256];
+    let mut i: u8 = 33;
+    for c in BSCII.chars() {
+        char_map[c as usize] = i as char;
+        i += 1;
+    }
+    return char_map;
+}
+
+
+pub fn encode_str(encoded: &str) -> String{
+    let mut decoded = "".to_owned();
+    let char_map = get_reverse_map();
+
+    for char in encoded.chars() {
+        decoded.push(char_map[char as usize]);
+    }
+
+    return decoded;
 }
 
 
@@ -16,8 +43,7 @@ pub fn decode_str(encoded: &str) -> String{
     let char_map = get_map();
 
     for char in encoded.chars() {
-        let i: usize = (char as usize - 33) as usize;
-        decoded.push(char_map[i]);
+        decoded.push(char_map[char as usize]);
     }
 
     return decoded;
@@ -28,8 +54,7 @@ pub fn decode_bytes(encoded: &Bytes) -> String{
     let char_map = get_map();
 
     for byte in encoded {
-        let i: usize = (byte - 33) as usize;
-        print!("{}", char_map[i]);
+        decoded.push(char_map[*byte as usize]);
     }
 
     return decoded;
