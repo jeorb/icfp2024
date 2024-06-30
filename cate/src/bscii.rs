@@ -1,3 +1,5 @@
+use core::fmt;
+
 use bytes::Bytes;
 
 
@@ -17,10 +19,50 @@ pub enum Token {
     String {
         value: String,
     },
+    Unary {
+        value: UnaryOperator,
+    },
     Other {
         value: String,
     }
 }
+
+#[derive(Debug)]
+pub enum UnaryOperator {
+    IntegerNegation,
+    BooleanNot,
+    StringToInt,
+    IntToString,
+    Invalid,
+}
+
+impl ::core::fmt::Display for Token {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Token::Boolean { value: v } => { write!(f, "Boolean: {}", &v) },
+            Token::Integer { value: v } => { write!(f, "Integer: {}", &v) },
+            Token::String  { value: v } => { write!(f, "String: {}",  &v) },
+            Token::Unary   { value: v } => { write!(f, "Unary: {}",   &v) },
+            Token::Other   { value: v } => { write!(f, "Other: {}",   &v) },
+        }
+    }
+}
+
+
+impl ::core::fmt::Display for UnaryOperator {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            UnaryOperator::IntegerNegation => { write!(f, "IntegerNegation") },
+            UnaryOperator::BooleanNot      => { write!(f, "BooleanNot") },
+            UnaryOperator::StringToInt     => { write!(f, "StringToInt") },
+            UnaryOperator::IntToString     => { write!(f, "IntToString") },
+            UnaryOperator::Invalid         => { write!(f, "InvalidUnaryOperator") },
+        }
+    }
+}
+
 
 impl Default for Encoder {
     fn default() -> Encoder {
@@ -47,7 +89,7 @@ impl Encoder {
     }
     
     
-    pub fn decode_str(&self, encoded: &str) -> String{
+    /*pub fn decode_str(&self, encoded: &str) -> String{
         let mut decoded = "".to_owned();
     
         for char in encoded.chars() {
@@ -55,7 +97,7 @@ impl Encoder {
         }
     
         return decoded;
-    }
+    }*/
     
     
     pub fn decode_token(&self, encoded: &[u8]) -> Token {
@@ -69,13 +111,27 @@ impl Encoder {
                 Token::Boolean { value: false }  
             },
             b'I' => {
-                Token::Integer { value: encoded[1] as u32 }  
+                let mut v: u32 = 0;
+                for byte in encoded.iter().skip(1) {
+                    v = (v * 94) + (*byte as u32 - 33);
+                }
+                Token::Integer { value: v }  
             },
             b'S' => {
                 for byte in encoded.iter().skip(1) {
                     decoded.push(self.bscii[*byte as usize]);
                 }
                 Token::String { value: decoded }  
+            },
+            b'U' => {
+                let op = match encoded[1] {
+                    b'-' => { UnaryOperator::IntegerNegation }
+                    b'!' => { UnaryOperator::BooleanNot }
+                    b'#' => { UnaryOperator::StringToInt }
+                    b'$' => { UnaryOperator::IntToString }
+                    _ => { UnaryOperator::Invalid }
+                };
+                Token::Unary { value: op }  
             },
             _ => {
                 Token::Other { value: std::str::from_utf8(encoded).expect("invalid ASCII bytes").to_owned() }

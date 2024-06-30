@@ -68,7 +68,10 @@ async fn encode(encoder: &bscii::Encoder, msg: &str){
 
 
 async fn decode(encoder: &bscii::Encoder, msg: &str){
-    println!("{}", encoder.decode_str(msg));
+    let tokens = encoder.decode_bytes(&bytes::Bytes::from(msg.to_owned()));
+    for token in tokens {
+        println!("{}", token);
+    }
 }
 
 
@@ -99,11 +102,14 @@ async fn send(encoder: &bscii::Encoder, msg: &str, raw: bool) -> Result<(), Box<
                 Token::String { value } => { println!("{}", value); },
                 Token::Boolean { value } => { println!("{}", value); },
                 Token::Integer { value } => { println!("{}", value); },
+                Token::Unary { value } => { println!("{}", value); },
                 Token::Other { value } => { println!("{}", value); },
             }
         }
     } else {
-        println!("body:  {:?}", tokens);
+        for token in tokens {
+            println!("{}", token);
+        }
     }
 
     Ok(())
