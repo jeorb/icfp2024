@@ -69,11 +69,44 @@ async fn encode(encoder: &bscii::Encoder, msg: &str){
 
 async fn decode(encoder: &bscii::Encoder, msg: &str){
     let tokens = encoder.decode_bytes(&bytes::Bytes::from(msg.to_owned()));
-    for token in tokens {
-        println!("{}", token);
-    }
+    print_tokens(&tokens);
 }
 
+
+fn print_tokens(tokens: &Vec<Token>){
+    let mut stack: Vec<u32> = Vec::new();
+    for token in tokens {
+        let mut args = 0;
+        let indent = format!("{space:>depth$}", space="", depth=(stack.len())*4);
+        print!("{}", indent);
+        match token {
+            Token::String   { value } => { println!("\"{}\"", value); },
+            Token::Boolean  { value } => { println!("{}", value); },
+            Token::Integer  { value } => { println!("{}", value); },
+            Token::Unary    { value } => { println!("{} (", value); args = 1; },
+            Token::Binary   { value } => { println!("{} (", value); args = 2; },
+            Token::Lambda   { value } => { println!("v{} (", value); args = 1; },
+            Token::Variable { value } => { println!("v{}", value); },
+            Token::Other    { value } => { println!("{}", value); },
+        }
+        if args > 0 {
+            stack.push(args);
+        } else {
+            while !stack.is_empty() {
+                let mut last = stack.pop().expect("Reached below the bottom of the stack.");
+                last = last - 1;
+
+                if last == 0 {
+                    let indent = format!("{space:>depth$}", space="", depth=(stack.len())*4);
+                    println!("{})", indent);
+                } else {
+                    stack.push(last);
+                    break;
+                }
+            }
+        }
+    }
+}
 
 async fn send(encoder: &bscii::Encoder, msg: &str, raw: bool) -> Result<(), Box<dyn std::error::Error>> {
     let icfp_token = env::var("ICFP_TOKEN").expect("Missing ICFP_TOKEN environment variable.");
@@ -99,17 +132,18 @@ async fn send(encoder: &bscii::Encoder, msg: &str, raw: bool) -> Result<(), Box<
     if raw {
         for token in tokens {
             match token {
-                Token::String { value } => { println!("{}", value); },
-                Token::Boolean { value } => { println!("{}", value); },
-                Token::Integer { value } => { println!("{}", value); },
-                Token::Unary { value } => { println!("{}", value); },
-                Token::Other { value } => { println!("{}", value); },
+                Token::String   { value } => { println!("{}", value); },
+                Token::Boolean  { value } => { println!("{}", value); },
+                Token::Integer  { value } => { println!("{}", value); },
+                Token::Unary    { value } => { println!("{}", value); },
+                Token::Binary   { value } => { println!("{}", value); },
+                Token::Lambda   { value } => { println!("{}", value); },
+                Token::Variable { value } => { println!("{}", value); },
+                Token::Other    { value } => { println!("{}", value); },
             }
         }
     } else {
-        for token in tokens {
-            println!("{}", token);
-        }
+        print_tokens(&tokens);
     }
 
     Ok(())

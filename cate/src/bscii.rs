@@ -22,6 +22,15 @@ pub enum Token {
     Unary {
         value: UnaryOperator,
     },
+    Binary {
+        value: BinaryOperator,
+    },
+    Lambda {
+        value: u32,
+    },
+    Variable {
+        value: u32,
+    },
     Other {
         value: String,
     }
@@ -33,18 +42,33 @@ pub enum UnaryOperator {
     BooleanNot,
     StringToInt,
     IntToString,
-    Invalid,
+    Invalid {
+        value: String,
+    },
+}
+
+#[derive(Debug)]
+pub enum BinaryOperator {
+    IntegerAddition,
+    StringConcatenation,
+    Apply,
+    Invalid {
+        value: String,
+    },
 }
 
 impl ::core::fmt::Display for Token {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Token::Boolean { value: v } => { write!(f, "Boolean: {}", &v) },
-            Token::Integer { value: v } => { write!(f, "Integer: {}", &v) },
-            Token::String  { value: v } => { write!(f, "String: {}",  &v) },
-            Token::Unary   { value: v } => { write!(f, "Unary: {}",   &v) },
-            Token::Other   { value: v } => { write!(f, "Other: {}",   &v) },
+            Token::Boolean   { value: v } => { write!(f, "Boolean: {}",  &v) },
+            Token::Integer   { value: v } => { write!(f, "Integer: {}",  &v) },
+            Token::String    { value: v } => { write!(f, "String: {}",   &v) },
+            Token::Unary     { value: v } => { write!(f, "Unary: {}",    &v) },
+            Token::Binary    { value: v } => { write!(f, "Binary: {}",   &v) },
+            Token::Lambda    { value: v } => { write!(f, "Lambda: {}",   &v) },
+            Token::Variable  { value: v } => { write!(f, "Variable: {}", &v) },
+            Token::Other     { value: v } => { write!(f, "Other: {}",    &v) },
         }
     }
 }
@@ -54,11 +78,24 @@ impl ::core::fmt::Display for UnaryOperator {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            UnaryOperator::IntegerNegation => { write!(f, "IntegerNegation") },
-            UnaryOperator::BooleanNot      => { write!(f, "BooleanNot") },
-            UnaryOperator::StringToInt     => { write!(f, "StringToInt") },
-            UnaryOperator::IntToString     => { write!(f, "IntToString") },
-            UnaryOperator::Invalid         => { write!(f, "InvalidUnaryOperator") },
+            UnaryOperator::IntegerNegation   => { write!(f, "IntegerNegation") },
+            UnaryOperator::BooleanNot        => { write!(f, "BooleanNot") },
+            UnaryOperator::StringToInt       => { write!(f, "StringToInt") },
+            UnaryOperator::IntToString       => { write!(f, "IntToString") },
+            UnaryOperator::Invalid { value } => { write!(f, "InvalidUnaryOperator \"{}\"", value) },
+        }
+    }
+}
+
+
+impl ::core::fmt::Display for BinaryOperator {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            BinaryOperator::IntegerAddition     => { write!(f, "IntegerAddition") },
+            BinaryOperator::StringConcatenation => { write!(f, "StringConcatenation") },
+            BinaryOperator::Apply               => { write!(f, "Apply") },
+            BinaryOperator::Invalid { value }   => { write!(f, "InvalidBinaryOperator \"{}\"", value) },
         }
     }
 }
@@ -117,6 +154,20 @@ impl Encoder {
                 }
                 Token::Integer { value: v }  
             },
+            b'L' => {
+                let mut v: u32 = 0;
+                for byte in encoded.iter().skip(1) {
+                    v = (v * 94) + (*byte as u32 - 33);
+                }
+                Token::Lambda { value: v }  
+            },
+            b'v' => {
+                let mut v: u32 = 0;
+                for byte in encoded.iter().skip(1) {
+                    v = (v * 94) + (*byte as u32 - 33);
+                }
+                Token::Variable { value: v }  
+            },
             b'S' => {
                 for byte in encoded.iter().skip(1) {
                     decoded.push(self.bscii[*byte as usize]);
@@ -129,9 +180,18 @@ impl Encoder {
                     b'!' => { UnaryOperator::BooleanNot }
                     b'#' => { UnaryOperator::StringToInt }
                     b'$' => { UnaryOperator::IntToString }
-                    _ => { UnaryOperator::Invalid }
+                    _ => { UnaryOperator::Invalid { value: std::str::from_utf8(encoded).expect("invalid ASCII bytes").to_owned() } }
                 };
                 Token::Unary { value: op }  
+            },
+            b'B' => {
+                let op = match encoded[1] {
+                    b'+' => { BinaryOperator::IntegerAddition }
+                    b'.' => { BinaryOperator::StringConcatenation }
+                    b'$' => { BinaryOperator::Apply }
+                    _ => { BinaryOperator::Invalid { value: std::str::from_utf8(encoded).expect("invalid ASCII bytes").to_owned() } }
+                };
+                Token::Binary { value: op }  
             },
             _ => {
                 Token::Other { value: std::str::from_utf8(encoded).expect("invalid ASCII bytes").to_owned() }
