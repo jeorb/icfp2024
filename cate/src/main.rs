@@ -2,6 +2,7 @@ use std::env;
 use clap::{Parser, Subcommand};
 
 mod bscii;
+use bscii::Token;
 
 
 #[derive(Parser)]
@@ -31,6 +32,9 @@ enum Commands {
     Send {
         /// ASCII string
         message: String,
+        #[arg(long, default_value_t = false)]
+        /// Print the raw decoded response from the server with no structure or type definitions
+        raw: bool,
     },
 }
 
@@ -39,15 +43,17 @@ enum Commands {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
 
+    let encoder = bscii::Encoder::new();
+
     match &cli.command {
         Some(Commands::Encode { message }) => {
-            let _ = encode(&message).await;
+            let _ = encode(&encoder, &message).await;
         }
         Some(Commands::Decode { message }) => {
-            let _ = decode(&message).await;
+            let _ = decode(&encoder, &message).await;
         }
-        Some(Commands::Send { message }) => {
-            let _ = send(&message).await;
+        Some(Commands::Send { message, raw }) => {
+            let _ = send(&encoder, &message, *raw).await;
         }
         None => {}
     }
@@ -56,22 +62,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 
-async fn encode(msg: &str){
-    println!("{}", bscii::encode_str(msg));
+async fn encode(encoder: &bscii::Encoder, msg: &str){
+    println!("{}", encoder.encode_str(msg));
 }
 
-async fn decode(msg: &str){
-    println!("{}", bscii::decode_str(msg));
+
+async fn decode(encoder: &bscii::Encoder, msg: &str){
+    println!("{}", encoder.decode_str(msg));
 }
 
-async fn send(msg: &str) -> Result<(), Box<dyn std::error::Error>> {
+
+async fn send(encoder: &bscii::Encoder, msg: &str, raw: bool) -> Result<(), Box<dyn std::error::Error>> {
     let icfp_token = env::var("ICFP_TOKEN").expect("Missing ICFP_TOKEN environment variable.");
-    //let message = "S'%4}).$%8";
+    //"get index" == "S'%4}).$%8";
     let mut message: String = "S".to_owned();
+    message.push_str(&encoder.encode_str(msg));
 
-    println!("Sending message: {}", msg);
-    message.push_str(&bscii::encode_str(msg));
-    println!("Sending message: {}", message);
+    if !raw {
+        println!("Sending message: '{}' encoded as '{}'", msg, message);
+    }
 
     let client = reqwest::Client::new();
     let resp = client.post("https://boundvariable.space/communicate")
@@ -80,17 +89,24 @@ async fn send(msg: &str) -> Result<(), Box<dyn std::error::Error>> {
         .send()
         .await?;
 
-        //println!("resp: {resp:#?}");
+    let body = resp.bytes().await?;
 
-        //let body = resp.text().await?;
-        //println!("body:  {body:#?}");
+    let tokens = encoder.decode_bytes(&body);
 
-        let body = resp.bytes().await?;
+    if raw {
+        for token in tokens {
+            match token {
+                Token::String { value } => { println!("{}", value); },
+                Token::Boolean { value } => { println!("{}", value); },
+                Token::Integer { value } => { println!("{}", value); },
+                Token::Other { value } => { println!("{}", value); },
+            }
+        }
+    } else {
+        println!("body:  {:?}", tokens);
+    }
 
-        println!("body:  {}", bscii::decode_bytes(&body));
-
-        Ok(())
-
+    Ok(())
 }
 
 
