@@ -8,8 +8,9 @@ pub struct Encoder {
     bscii: [char; 256],
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Token {
+    Root,
     Boolean {
         value: bool,
     },
@@ -36,7 +37,7 @@ pub enum Token {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum UnaryOperator {
     IntegerNegation,
     BooleanNot,
@@ -47,20 +48,41 @@ pub enum UnaryOperator {
     },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum BinaryOperator {
     IntegerAddition,
+    IntegerSubtraction,
+    IntegerMultiplication,
+    IntegerDivision,
+    IntegerModulo,
+    IntegerLessThan,
+    IntegerGreaterThan,
+    Equality,
     StringConcatenation,
+    StringTake,
+    StringDrop,
     Apply,
     Invalid {
         value: String,
     },
 }
 
+impl Token {
+    pub fn num_args(&self) -> usize {
+        match self {
+            Token::Unary     { value: _ } => { 1 },
+            Token::Binary    { value: _ } => { 2 },
+            Token::Lambda    { value: _ } => { 1 },
+            _                             => { 0 },
+        }
+    }
+}
+
 impl ::core::fmt::Display for Token {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            Token::Root                   => { write!(f, "Root",           ) },
             Token::Boolean   { value: v } => { write!(f, "Boolean: {}",  &v) },
             Token::Integer   { value: v } => { write!(f, "Integer: {}",  &v) },
             Token::String    { value: v } => { write!(f, "String: {}",   &v) },
@@ -92,10 +114,19 @@ impl ::core::fmt::Display for BinaryOperator {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            BinaryOperator::IntegerAddition     => { write!(f, "IntegerAddition") },
-            BinaryOperator::StringConcatenation => { write!(f, "StringConcatenation") },
-            BinaryOperator::Apply               => { write!(f, "Apply") },
-            BinaryOperator::Invalid { value }   => { write!(f, "InvalidBinaryOperator \"{}\"", value) },
+            BinaryOperator::IntegerAddition       => { write!(f, "IntegerAddition") },
+            BinaryOperator::IntegerSubtraction    => { write!(f, "IntegerSubtraction") },
+            BinaryOperator::IntegerMultiplication => { write!(f, "IntegerMultiplication") },
+            BinaryOperator::IntegerDivision       => { write!(f, "IntegerDivision") },
+            BinaryOperator::IntegerModulo         => { write!(f, "IntegerModulo") },
+            BinaryOperator::IntegerLessThan       => { write!(f, "IntegerLessThan") },
+            BinaryOperator::IntegerGreaterThan    => { write!(f, "IntegerGreaterThan") },
+            BinaryOperator::Equality              => { write!(f, "Equality") },
+            BinaryOperator::StringConcatenation   => { write!(f, "StringConcatenation") },
+            BinaryOperator::StringTake            => { write!(f, "StringTake") },
+            BinaryOperator::StringDrop            => { write!(f, "StringDrop") },
+            BinaryOperator::Apply                 => { write!(f, "Apply") },
+            BinaryOperator::Invalid { value }     => { write!(f, "InvalidBinaryOperator \"{}\"", value) },
         }
     }
 }
@@ -187,7 +218,16 @@ impl Encoder {
             b'B' => {
                 let op = match encoded[1] {
                     b'+' => { BinaryOperator::IntegerAddition }
+                    b'-' => { BinaryOperator::IntegerSubtraction }
+                    b'*' => { BinaryOperator::IntegerMultiplication }
+                    b'/' => { BinaryOperator::IntegerDivision }
+                    b'%' => { BinaryOperator::IntegerModulo }
+                    b'<' => { BinaryOperator::IntegerLessThan }
+                    b'>' => { BinaryOperator::IntegerGreaterThan }
+                    b'=' => { BinaryOperator::Equality }
                     b'.' => { BinaryOperator::StringConcatenation }
+                    b'T' => { BinaryOperator::StringTake }
+                    b'D' => { BinaryOperator::StringDrop }
                     b'$' => { BinaryOperator::Apply }
                     _ => { BinaryOperator::Invalid { value: std::str::from_utf8(encoded).expect("invalid ASCII bytes").to_owned() } }
                 };
